@@ -96,3 +96,140 @@ autoplot(survfit(Surv(Age, rep(1, length(Status))) ~ Agem), col=c(3,6,7)) + ggti
 
 # Print out the table of FMG religion distribution for analysis
 table(FMG$Religion)
+###############Modeling Determinants of Low Birth Weight for Under Five-Children in Ethiopia################
+####### Loading Necessary Packages ######
+# These packages are required for the analysis.
+library(foreign)    # To read SPSS data
+library(lattice)    # For graphical data representation
+library(nlme)       # For linear mixed-effects models
+library(faraway)    # For statistical modeling
+library(gmodels)    # For regression models
+library(lme4)       # For mixed-effects models
+library(rcpp)       # For Rcpp integration
+
+# Clear the environment to start fresh
+rm(list = ls())
+
+# ##############################
+# ### Reading and Preparing Data ###
+# ##############################
+
+# Reading data from SPSS file and displaying the contents
+lbirth <- read.spss("C:\\Users\\TOSHIBA\\Desktop\\Birth13trial.sav", to.data.frame = TRUE)
+View(lbirth)  # View the dataset
+
+# Convert the data to a dataframe format
+lbirthh <- as.data.frame(lbirth)
+head(lbirthh)  # Display the first few rows for inspection
+
+# Attach the dataset for direct referencing of columns
+attach(lbirthh)
+
+# ##############################
+# ### Logistic Regression Model ###
+# ##############################
+
+# Fit a logistic regression model to predict 'Childsize' based on various factors
+fit <- glm(Childsize ~ Sex + Wealth + Residence + Age + Termpregnancy +
+           Antenatalcare + Maritalst + Vaccination + Anemia + Educationle + 
+           Birthorder + Prebirthinterval, family = binomial, data = lbirthh)
+summary(fit)  # View a summary of the model results
+
+# ##########################
+# ### Mixed-Effects Models ###
+# ##########################
+
+# Fit a mixed-effects logistic regression model including random effects for 'Region' and 'CLID'
+fit1 <- glmer(Childsize ~ Sex + Wealth + Residence + Age + Termpregnancy + 
+              Antenatalcare + Maritalst + Vaccination + Anemia + Educationle + 
+              Birthorder + Prebirthinterval + (1|Region) + (1|CLID),
+              family = binomial, data = lbirthh)
+
+# Print the model's result without correlation values and show summary
+print(fit1, corr = FALSE)
+summary(fit1)
+
+# Compare the random effects of different models
+anova(fit1, fit3, fit4, fit5, fit6)
+
+# ##########################
+# ### Fitting More Models ###
+# ##########################
+
+# Repeated analysis with different random effect structures:
+fit2 <- glmer(Childsize ~ Sex + Wealth + Residence + Age + Termpregnancy +
+              Antenatalcare + Maritalst + Vaccination + Anemia + Educationle + 
+              Birthorder + Prebirthinterval + (1|CLID), family = binomial, data = lbirthh)
+print(fit2, corr = FALSE)
+summary(fit2)
+
+# Compare model fit between 'fit1' and 'fit2'
+anova(fit2, fit1)
+
+# ##########################
+# ### Comparison of Random Effects ###
+# ##########################
+# Fit additional models with different variations of random effects
+fit3 <- glmer(Childsize ~ Sex + Wealth + Residence + Age + Termpregnancy + 
+              Antenatalcare + Maritalst + Vaccination + Anemia + Educationle + 
+              Birthorder + (1|Region) + (1|CLID), family = binomial, data = lbirthh)
+print(fit3, corr = FALSE)
+summary(fit3)
+
+# Fitting models with various specifications for comparison
+fit4 <- glmer(Childsize ~ Sex + Wealth + Residence + Age + Antenatalcare + 
+              Maritalst + Vaccination + Anemia + Educationle + Birthorder +
+              (1|Region) + (1|CLID), family = binomial, data = lbirthh)
+summary(fit4)
+
+# Adjust model further with reduced parameters
+fit5 <- glmer(Childsize ~ Sex + Wealth + Residence + Age + Antenatalcare + 
+              Maritalst + Vaccination + Anemia + Educationle + (1|Region) + 
+              (1|CLID), family = binomial, data = lbirthh)
+summary(fit5)
+
+# Refined model with fewer predictors
+fit6 <- glmer(Childsize ~ Sex + Wealth + Age + Antenatalcare + Maritalst + 
+              Vaccination + Anemia + Educationle + (1|Region) + (1|CLID), 
+              family = binomial, data = lbirthh)
+summary(fit6)
+
+# ##########################
+# ### Calculate Confidence Intervals ###
+# ##########################
+
+# Compute fitted values and their 95% confidence intervals for model 'fit6'
+fitted_values <- fitted(fit6)
+lower <- coef(summary(fit6))[, 1] + qnorm(0.025) * coef(summary(fit6))[, 2]
+upper <- coef(summary(fit6))[, 1] + qnorm(0.975) * coef(summary(fit6))[, 2]
+cbind(coef(summary(fit6)), lower, upper)
+
+# ##############################
+# ### Comparison of Random Effects ###
+# ##############################
+# Compare all models for random effects and determine the best fit
+anova(fit1, fit2, fit3, fit4, fit5, fit6)
+
+# ##########################
+# ### Model Diagnosis Plots ###
+# ##########################
+
+# Set up 2x2 plot grid
+par(mfrow = c(2, 2))
+
+# 1. Residuals Normality Check
+qqnorm(resid(fit6), main = "Residual Normal Plot", col = 3, adj = 0.1)
+
+# 2. Residuals vs. CLID
+plot(lbirthh$CLID, resid(fit6), xlab = "CLID", ylab = "Residuals",
+     main = "Residuals vs. Observation", col = 4, adj = 0.1)
+abline(h = 0, col = 2)  # Add horizontal line at 0
+
+# 3. Random Effects at Region Level
+qqnorm(ranef(fit6)$"Region"[[1]], main = "Regional Level Random Effects", col = 2, adj = 0.1)
+
+# 4. Random Effects at Cluster Level (CLID)
+qqnorm(ranef(fit6)$"CLID"[[1]], main = "Cluster Level Random Effects", col = 6, adj = 0.1)
+
+# End of the script
+
